@@ -19,11 +19,13 @@ public:
     virtual ~VulkanInstance();
 
     const VkResult enumeratePhysicalDevices(uint32_t& physicalDeviceCount, VkPhysicalDevice* pPhysicalDevices) const;
-    void getPhysicalDeviceQueueFamilyProperties(const VkPhysicalDevice& physicalDevice,
+    static void getPhysicalDeviceQueueFamilyProperties(const VkPhysicalDevice& physicalDevice,
                                                 uint32_t& queueFamilyPropertyCount,
                                                 VkQueueFamilyProperties* pQueueFamilyProperties);
 
-    const bool supportVulkan() const;
+//    const bool supportVulkan() const;
+    static bool getPhysicalDeviceHasRequiredFeatures(const VkPhysicalDevice& physicalDevice) ;
+    bool supportVulkan() const;
 
     VkInstance get() const {
         return mInstance;

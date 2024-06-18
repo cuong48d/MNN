@@ -64,10 +64,23 @@ void VulkanInstance::getPhysicalDeviceQueueFamilyProperties(const VkPhysicalDevi
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyPropertyCount, pQueueFamilyProperties);
 }
 
-const bool VulkanInstance::supportVulkan() const {
+bool VulkanInstance::getPhysicalDeviceHasRequiredFeatures(const VkPhysicalDevice& physicalDevice) {
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+
+    return deviceFeatures.shaderStorageImageWriteWithoutFormat == VK_TRUE;
+}
+bool VulkanInstance::supportVulkan() const {
     uint32_t gpuCount = 0;
-    auto res          = enumeratePhysicalDevices(gpuCount, nullptr);
-    if ((0 == gpuCount) || (VK_SUCCESS != res)) {
+//    auto res          = enumeratePhysicalDevices(gpuCount, nullptr);
+//    if ((0 == gpuCount) || (VK_SUCCESS != res)) {
+    if (enumeratePhysicalDevices(gpuCount, nullptr) != VK_SUCCESS || gpuCount < 1) {
+        MNN_ERROR("Invalide device for support vulkan\n");
+        return false;
+    }
+    std::vector<VkPhysicalDevice> vulkanDevices;
+    vulkanDevices.reserve(gpuCount);
+    if (enumeratePhysicalDevices(gpuCount, vulkanDevices.data()) != VK_SUCCESS || !getPhysicalDeviceHasRequiredFeatures(vulkanDevices[0])) {
         MNN_ERROR("Invalide device for support vulkan\n");
         return false;
     }

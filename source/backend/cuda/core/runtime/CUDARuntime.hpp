@@ -141,6 +141,7 @@ private:
     float mFlops            = 4.0f;
     bool mIsCreateError{false};
     size_t mThreadPerBlock = 128;
+    int getBestCudaDevice() const;
 
 private:
     std::map<std::pair<std::vector<int32_t>, std::vector<uint32_t>>, std::pair<std::string, uint32_t>> mTunedBlockWarpShape;
