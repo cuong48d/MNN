@@ -82,8 +82,7 @@ private:
     bool _supportImageSize(const Tensor* tensor);
     const VulkanDevice& device() const;
     void _finish() const;
-    //void _allocHostBuffer(size_t size) const;
-    void _allocHostBuffer(size_t size, bool hostCached) const;
+    void _allocHostBuffer(size_t size) const;
 
     std::shared_ptr<VulkanCommandPool::Buffer> mCmdBuffer;
     std::shared_ptr<VulkanCommandPool::Buffer> mInitBuffer;
