@@ -15,19 +15,21 @@
 #include <regex>
 #include <set>
 #include <climits>
+namespace MNN {
+namespace Transformer {
 
 // base64
 static const std::string base64_chars =
-             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-             "abcdefghijklmnopqrstuvwxyz"
-             "0123456789+/";
+"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+"abcdefghijklmnopqrstuvwxyz"
+"0123456789+/";
 
 static inline bool is_base64(unsigned char c) {
     return (isalnum(c) || (c == '+') || (c == '/'));
 }
 
 static inline size_t one_char_len(const char *src) {
-  return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
+    return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
 }
 
 static std::string base64_decode(const std::string& str) {
@@ -128,6 +130,10 @@ bool Tokenizer::is_stop(int token) {
     return std::find(stop_tokens_.begin(), stop_tokens_.end(), token) != stop_tokens_.end();
 }
 
+bool Tokenizer::is_special(int token) {
+    return std::find(special_tokens_.begin(), special_tokens_.end(), token) != special_tokens_.end();
+}
+
 void Tokenizer::load_special(std::ifstream& tok_file) {
     std::string line;
     std::getline(tok_file, line);
@@ -201,7 +207,7 @@ bool Sentencepiece::load_vocab(std::ifstream& tok_file) {
         line_str >> token >> score >> type;
         token = base64_decode(token);
         auto piece_type = static_cast<PieceType>(type);
-        SentencePiece piece {token, score, piece_type};
+        SentencePiece piece = {token, score, piece_type};
         sentence_pieces_[index] = std::move(piece);
         if (piece_type == PieceType::NORMAL) {
             pieces_.insert({token, index});
@@ -236,7 +242,7 @@ std::string Sentencepiece::byte_to_piece(unsigned char c) const {
 }
 
 // ref: https://github.com/google/sentencepiece/blob/master/src/bpe_model.cc
-Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalized, float alpha) {
+Sentencepiece::EncodeResult Sentencepiece::bpe_encode(string_view_ normalized, float alpha) {
     // util class begin
     struct SymbolPair {
         int left;     // left index of this pair
@@ -256,7 +262,7 @@ Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalize
         int prev;     // prev index of this symbol. -1 for BOS.
         int next;     // next index of tihs symbol. -1 for EOS.
         bool freeze = false;  // this symbol is never be merged.
-        std::string_view piece;
+        string_view_ piece;
     };
     // util class end
 
@@ -265,7 +271,7 @@ Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalize
     std::vector<Symbol> symbols;
     symbols.reserve(normalized.size());
     // Reverse merge rules. key: merged symbol, value: pair of original symbols.
-    std::unordered_map<std::string_view, std::pair<std::string_view, std::string_view>> rev_merge;
+    std::unordered_map<string_view_, std::pair<string_view_, string_view_>> rev_merge;
     // SymbolPair holder.
     std::vector<std::unique_ptr<SymbolPair>> symbol_pair_holder;
     // Lookup new symbol pair at [left, right] and inserts it to agenda.
@@ -273,8 +279,8 @@ Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalize
         if (left == -1 || right == -1 || symbols[left].freeze || symbols[right].freeze) {
             return;
         }
-        const std::string_view piece(symbols[left].piece.data(), symbols[left].piece.size() + symbols[right].piece.size());
-        std::string piece_str(piece);
+        const string_view_ piece(symbols[left].piece.data(), symbols[left].piece.size() + symbols[right].piece.size());
+        std::string piece_str(piece.to_string());
         const auto it = pieces_.find(piece_str);
         if (it == pieces_.end()) {
             return;
@@ -298,7 +304,7 @@ Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalize
         Symbol s;
         // const int mblen = matcher_->PrefixMatch(normalized, &s.freeze);
         int mblen = std::min<int>(normalized.size(), one_char_len(normalized.data()));
-        s.piece = std::string_view(normalized.data(), mblen);
+        s.piece = string_view_(normalized.data(), mblen);
         s.prev = index == 0 ? -1 : index - 1;
         normalized.remove_prefix(mblen);
         s.next = normalized.empty() ? -1 : index + 1;
@@ -338,25 +344,25 @@ Sentencepiece::EncodeResult Sentencepiece::bpe_encode(std::string_view normalize
 
         if (skip_merge()) continue;
         // Replaces symbols with `top` rule.
-        symbols[top->left].piece = std::string_view(
-            symbols[top->left].piece.data(),
-            symbols[top->left].piece.size() + symbols[top->right].piece.size());
+        symbols[top->left].piece = string_view_(
+                                                symbols[top->left].piece.data(),
+                                                symbols[top->left].piece.size() + symbols[top->right].piece.size());
 
         // Updates prev/next pointers.
         symbols[top->left].next = symbols[top->right].next;
         if (symbols[top->right].next >= 0) {
-        symbols[symbols[top->right].next].prev = top->left;
+            symbols[symbols[top->right].next].prev = top->left;
         }
-        symbols[top->right].piece = std::string_view("");
+        symbols[top->right].piece = string_view_("");
 
         // Adds new symbol pairs which are newly added after symbol replacement.
         MaybeAddNewSymbolPair(symbols[top->left].prev, top->left);
         MaybeAddNewSymbolPair(top->left, symbols[top->left].next);
     }
 
-    std::function<void(std::string_view, EncodeResult*)> resegment;
-    resegment = [this, &resegment, &rev_merge](std::string_view w, EncodeResult *output) -> void {
-        std::string w_str(w);
+    std::function<void(string_view_, EncodeResult*)> resegment;
+    resegment = [this, &resegment, &rev_merge](string_view_ w, EncodeResult *output) -> void {
+        std::string w_str(w.to_string());
         const int id = piece_to_id(w_str);
         // std::cout << "piece: " << w << ", id = " << id << std::endl;
         if (id == -1 || !is_unused(id)) {
@@ -385,7 +391,7 @@ void Sentencepiece::encode(const std::string& str, std::vector<int>& ids) {
     auto result = bpe_encode(str);
     size_t consumed = 0;
     for (const auto &p : result) {
-        const std::string_view w = p.first;   // piece
+        const string_view_ w = p.first;   // piece
         const int id = p.second;              // id
         const bool is_unk = (id == unk_id_);
         if (is_unk && byte_fall_back_) {
@@ -581,11 +587,11 @@ std::string wstring_to_utf8(const std::wstring& str) {
 void byte_encode_token(const std::string& token,
                        const std::unordered_map<uint8_t, wchar_t>& b2u,
                        std::wstring* result) {
-  result->resize(0);
-  for (char c : token) {
-    wchar_t wc = b2u.at(uint8_t(c));
-    result->push_back(wc);
-  }
+    result->resize(0);
+    for (char c : token) {
+        wchar_t wc = b2u.at(uint8_t(c));
+        result->push_back(wc);
+    }
 }
 
 bool HuggingfaceTokenizer::load_vocab(std::ifstream& tok_file) {
@@ -607,10 +613,10 @@ bool HuggingfaceTokenizer::load_vocab(std::ifstream& tok_file) {
         std::getline(tok_file, line);
         int d = line.find(" ");
         bpe_ranks_.insert({{utf8_to_wstring(line.substr(0, d)),
-                            utf8_to_wstring(line.substr(d + 1))}, i});
+            utf8_to_wstring(line.substr(d + 1))}, i});
     }
     // bytes_to_unicode
-     auto _insert_range = [=](int start, int end) {
+    auto _insert_range = [=](int start, int end) {
         for (int c = start; c <= end; c++) {
             b2u_.insert({uint8_t(c), wchar_t(c)});
         }
@@ -650,13 +656,13 @@ void HuggingfaceTokenizer::bpe(const std::wstring& token, const BPERanks& bpe_ra
     std::set<int> merged;  // records indices in pairs that were merged.
     auto _left = [](int i, std::set<int>& merged) {
         for (int j = i - 1; j >= -1; j--) {
-        if (merged.find(j) == merged.end()) return j;
+            if (merged.find(j) == merged.end()) return j;
         }
         return -1;
     };
     auto _right = [](int i, int cap, std::set<int>& merged) {
         for (int j = i + 1; j < cap; j++) {
-        if (merged.find(j) == merged.end()) return j;
+            if (merged.find(j) == merged.end()) return j;
         }
         return cap;
     };
@@ -669,14 +675,14 @@ void HuggingfaceTokenizer::bpe(const std::wstring& token, const BPERanks& bpe_ra
         int to_merge = -1;  // indices into pairs.
 
         for (int i = 0; i < pairs.size(); ++i) {
-        if (merged.find(i) == merged.end()) {  // pair i is not merged.
-            auto iter = bpe_ranks.find(pairs[i]);
-            int score = iter != bpe_ranks.end() ? iter->second : INT_MAX;
-            if (score < min_score) {
-            min_score = score;
-            to_merge = i;
+            if (merged.find(i) == merged.end()) {  // pair i is not merged.
+                auto iter = bpe_ranks.find(pairs[i]);
+                int score = iter != bpe_ranks.end() ? iter->second : INT_MAX;
+                if (score < min_score) {
+                    min_score = score;
+                    to_merge = i;
+                }
             }
-        }
         }
 
         if (to_merge == -1) break;
@@ -742,4 +748,6 @@ std::string HuggingfaceTokenizer::decode(int id) {
         }
     }
     return r;
+}
+}
 }

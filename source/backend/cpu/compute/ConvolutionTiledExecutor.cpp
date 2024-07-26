@@ -91,9 +91,12 @@ std::pair<size_t, std::pair<size_t, size_t>> ConvolutionTiledExecutor::computeBl
     return std::make_pair(total, std::make_pair(stride, kernelSize * maxLine));
 }
 
-void ConvolutionTiledExecutor:: setIm2ColParameter(ConvolutionCommon::Im2ColParameter& dstIm2ColParamter, const Convolution2DCommon* convCommon, Tensor* input, Tensor* output, int padX, int padY, const CoreFunctions* floatCore, const CoreInt8Functions* int8Core) {
+void ConvolutionTiledExecutor:: setIm2ColParameter(ConvolutionCommon::Im2ColParameter& dstIm2ColParamter, const Convolution2DCommon* convCommon, Tensor* input, Tensor* output, int padX, int padY, const CoreFunctions* floatCore, const CoreInt8Functions* int8Core, int pack) {
     // FIXME: Set int8 and float's pack as diff
-    int pack = floatCore->pack;
+    if (pack == 0) {
+        pack = floatCore->pack;
+    }
+    
     const auto kernelCount = convCommon->kernelX() * convCommon->kernelY();
 
     dstIm2ColParamter.dilateX         = convCommon->dilateX();

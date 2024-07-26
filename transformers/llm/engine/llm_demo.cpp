@@ -5,13 +5,13 @@
 //  ZhaodeWang
 //
 
-#include "llm.hpp"
+#include "llm/llm.hpp"
 #define MNN_OPEN_TIME_TRACE
 #include <MNN/AutoTime.hpp>
 #include <fstream>
 #include <sstream>
 #include <stdlib.h>
-
+using namespace MNN::Transformer;
 static void trace_prepare(Llm* llm) {
     MNN_PRINT("Prepare for resize opt Begin\n");
     std::vector<std::string> prompts = {
@@ -187,6 +187,7 @@ int main(int argc, const char* argv[]) {
     }
     if (argc < 3) {
         llm->chat();
+        return 0;
     }
     std::string prompt_file = argv[2];
     return eval(llm.get(), prompt_file);
